@@ -1,0 +1,46 @@
+#!/bin/sh
+
+# PROVIDE: teamcity
+# REQUIRE: LOGIN
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name=teamcity
+desc="Jetbrains TeamCity"
+rcvar=teamcity_enable
+
+load_rc_config "${name}"
+
+: ${teamcity_enable:=NO}
+
+pidfile=/var/run/${name}/${name}.pid
+logfile=/var/log/${name}.log
+start_precmd=do_prestart
+start_cmd=do_start
+command=/usr/sbin/daemon
+{% if '10.4-RELEASE' in ansible_env.SUDO_COMMAND %}
+command_args="-P ${pidfile} -o ${logfile} -u root /usr/local/TeamCity-2017.2.4/teamcity.sh run"
+{% else %}
+command_args="-P ${pidfile} -t ${name} -o ${logfile} -u root /usr/local/TeamCity-2017.2.4/teamcity.sh run"
+{% endif %}
+
+do_prestart()
+{
+        if [ ! -f "${logfile}" ]; then
+                #install -o "${jenkins_user}" -g "${jenkins_group}" -m 640 /dev/null "${jenkins_log_file}"
+                touch ${logfile}
+        fi
+        if [ ! -d "/var/run/${name}/" ]; then
+                install -d -o "root" -g "wheel" -m 750 "/var/run/${name}"
+        fi
+}
+
+do_start()
+{
+        check_startmsgs && echo "Starting ${name}."
+        exec ${command} ${command_args}
+
+}
+
+run_rc_command "$1"

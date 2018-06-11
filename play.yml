@@ -1,0 +1,66 @@
+---
+- name: Install
+  hosts: all
+
+  vars: {}
+
+  tasks:
+    - name: "Install packages from pkg"
+      pkgng:
+        name: "{{item}}"
+        state: present
+      with_items:
+      - openjdk8
+      - bash
+      - rinetd
+
+    - name: Download TeamCity
+      get_url:
+        url: https://download.jetbrains.com/teamcity/TeamCity-2017.2.4.tar.gz
+        dest: /usr/local/TeamCity-2017.2.4.tar.gz
+        checksum: sha256:8d21480da9392709efd6dd6cb7b513211a45e462909799b5b880e36def1522fc
+
+    - name: Unarchive TeamCity
+      shell: "tar -xvf TeamCity-2017.2.4.tar.gz"
+      args:
+        chdir: /usr/local
+        creates: /usr/local/TeamCity-2017.2.4
+
+    - name: Enable the rinetd service
+      shell: "sysrc rinetd_enable=YES"
+
+    - lineinfile:
+        path: /usr/local/etc/rinetd.conf
+        regexp: '.*8080$'
+        line: "{{ansible_default_ipv4.address}} 80 {{ansible_default_ipv4.address}} 8080"
+        create: True
+
+    - lineinfile:
+        path: /usr/local/etc/rinetd.conf
+        line: "logfile /var/log/rinetd.log"
+
+    - lineinfile:
+        path: /usr/local/etc/rinetd.conf
+        line: "logcommon"
+
+    - name: Start the rinetd daemon
+      service:
+        name: rinetd
+        state: started
+        enabled: yes
+
+    - template:
+        src: service.j2
+        dest: /usr/local/etc/rc.d/teamcity
+        owner: root
+        group: wheel
+        mode: "u=rwx,g=r,o=r"
+
+    - name: Enable the TeamCity service
+      shell: "sysrc teamcity_enable=YES"
+
+    - name: Start the TeamCity daemon
+      service:
+        name: teamcity
+        state: started
+        enabled: yes
